@@ -1,0 +1,6 @@
+{% macro status_badge(status) %}
+{% set labels = {"completed": "Completed", "running": "Running", "queued": "Pending", "failed": "Failed"} %}
+<span class="status-pill status-{{ status }}">
+  <span class="dot"></span>{{ labels.get(status, status | title) }}
+</span>
+{% endmacro %}

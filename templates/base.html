@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}SEO Audit Agents{% endblock %}</title>
+  <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+
+  {# Apply the saved theme before first paint so there is no light/dark flash. #}
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem("seo-theme");
+        if (!t && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) t = "dark";
+        if (t) document.documentElement.setAttribute("data-bs-theme", t);
+      } catch (e) {}
+    })();
+  </script>
+
+  {# Inter from Google Fonts. If the machine is offline the CSS falls back to the system font stack. #}
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap/css/bootstrap.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap-icons/bootstrap-icons.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+{% set crumbs = {
+  'dashboard.home': 'Dashboard',
+  'audit.new_audit': 'New audit',
+  'leads.index': 'Lead discovery',
+  'dashboard.history': 'History',
+  'audit.progress': 'Audit progress',
+  'audit.results': 'Results',
+} %}
+{% set ep = request.endpoint %}
+
+{% macro nav_links() %}
+  <a href="{{ url_for('dashboard.home') }}" class="sidebar-link {{ 'active' if request.endpoint == 'dashboard.home' }}">
+    <i class="bi bi-grid-1x2-fill"></i> Dashboard
+  </a>
+  <a href="{{ url_for('audit.new_audit') }}" class="sidebar-link {{ 'active' if request.endpoint == 'audit.new_audit' }}">
+    <i class="bi bi-plus-circle-fill"></i> New audit
+  </a>
+  <a href="{{ url_for('leads.index') }}" class="sidebar-link {{ 'active' if request.blueprint == 'leads' }}">
+    <i class="bi bi-geo-alt-fill"></i> Lead discovery
+  </a>
+  <a href="{{ url_for('dashboard.history') }}" class="sidebar-link {{ 'active' if request.endpoint in ('dashboard.history', 'audit.progress', 'audit.results') }}">
+    <i class="bi bi-clock-history"></i> History
+  </a>
+{% endmacro %}
+
+<div class="app-shell">
+  <aside class="app-sidebar d-none d-lg-flex">
+    <a class="sidebar-brand" href="{{ url_for('dashboard.home') }}">
+      <span class="brand-mark"><i class="bi bi-search"></i></span>
+      <span>SEO Audit Agents<span class="brand-sub">Crawl, analyse, report</span></span>
+    </a>
+    <nav class="sidebar-nav" aria-label="Main">
+      <div class="sidebar-section-label">Workspace</div>
+      {{ nav_links() }}
+      <div class="sidebar-cta">
+        <a href="{{ url_for('audit.new_audit') }}" class="btn btn-brand w-100">
+          <i class="bi bi-play-fill"></i>Start audit
+        </a>
+      </div>
+    </nav>
+    <div class="sidebar-foot">
+      <strong>BeyondSEO</strong> crawler<br>
+      Ollama (Qwen3) or rule-based analysis
+    </div>
+  </aside>
+
+  <div class="offcanvas offcanvas-start d-lg-none" tabindex="-1" id="mobileSidebar" aria-label="Menu">
+    <div class="app-sidebar">
+      <div class="sidebar-brand">
+        <span class="brand-mark"><i class="bi bi-search"></i></span>
+        <span>SEO Audit Agents</span>
+        <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+      </div>
+      <nav class="sidebar-nav" aria-label="Main">
+        {{ nav_links() }}
+        <div class="sidebar-cta">
+          <a href="{{ url_for('audit.new_audit') }}" class="btn btn-brand w-100">
+            <i class="bi bi-play-fill"></i>Start audit
+          </a>
+        </div>
+      </nav>
+    </div>
+  </div>
+
+  <div class="app-main">
+    <header class="app-topbar">
+      <button class="icon-btn topbar-toggle" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar" aria-label="Open menu">
+        <i class="bi bi-list"></i>
+      </button>
+      <div class="topbar-crumb">
+        <span>SEO Audit Agents</span>
+        <i class="bi bi-chevron-right"></i>
+        <strong>{{ crumbs.get(ep, 'Overview') }}</strong>
+      </div>
+      <div class="d-flex align-items-center gap-2 d-lg-none fw-semibold text-body-emphasis">
+        <span class="brand-mark" style="width:28px;height:28px;font-size:.85rem;border-radius:9px;"><i class="bi bi-search"></i></span>
+        SEO Audit
+      </div>
+      <div class="ms-auto d-flex align-items-center gap-2">
+        <button type="button" class="icon-btn theme-toggle" id="theme-toggle" aria-label="Toggle dark mode" title="Toggle dark mode">
+          <i class="bi bi-moon-stars-fill"></i><i class="bi bi-sun-fill"></i>
+        </button>
+        <a href="{{ url_for('audit.new_audit') }}" class="btn btn-brand btn-sm d-none d-sm-inline-flex">
+          <i class="bi bi-plus-lg"></i>New audit
+        </a>
+      </div>
+    </header>
+
+    <main class="app-content">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% set alert_icons = {
+            'danger': 'bi-exclamation-octagon-fill',
+            'warning': 'bi-exclamation-triangle-fill',
+            'info': 'bi-info-circle-fill',
+            'success': 'bi-check-circle-fill',
+          } %}
+          {% for category, msg in messages %}
+            {% set cat = category if category in alert_icons else 'info' %}
+            <div class="alert alert-{{ cat }} alert-dismissible fade show" role="alert">
+              <i class="bi {{ alert_icons[cat] }}"></i>
+              <div class="alert-body">{{ msg }}</div>
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      {% block content %}{% endblock %}
+    </main>
+
+    <footer class="app-footer text-center">
+      SEO Audit Agents &middot; BeyondSEO crawler + Ollama (Qwen3) analysis &middot; local web UI
+    </footer>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+{% block extra_scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,12 @@
+{% macro empty_state(title, message, icon="bi-inboxes", action_label=None, action_url=None) %}
+<div class="empty-state">
+  <div class="empty-icon"><i class="bi {{ icon }}"></i></div>
+  <h3>{{ title }}</h3>
+  <p>{{ message }}</p>
+  {% if action_label and action_url %}
+  <a href="{{ action_url }}" class="btn btn-brand">
+    <i class="bi bi-plus-lg"></i>{{ action_label }}
+  </a>
+  {% endif %}
+</div>
+{% endmacro %}

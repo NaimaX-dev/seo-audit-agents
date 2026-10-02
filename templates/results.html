@@ -1,0 +1,270 @@
+{% extends "base.html" %}
+{% from "components/severity_badge.html" import severity_badge %}
+{% from "components/stat_card.html" import stat_card %}
+{% set analysis = result.analysis %}
+{% set crawl = result.crawl %}
+{% block title %}Results for {{ result.site_url }} - SEO Audit Agents{% endblock %}
+
+{% block content %}
+{% set raw = (result.site_url or "").split("//")[-1].split("/")[0] %}
+{% set host = raw[4:] if raw.startswith("www.") else raw %}
+{% set bd = analysis.severity_breakdown or {} %}
+{% set sev_order = ['Critical', 'High', 'Medium', 'Low', 'Info', 'Unrated'] %}
+{% set sev_class = {'Critical': 'sw-critical', 'High': 'sw-high', 'Medium': 'sw-medium', 'Low': 'sw-low', 'Info': 'sw-info', 'Unrated': 'sw-unrated'} %}
+
+<div class="page-header">
+  <div class="result-head">
+    <span class="site-avatar lg av-{{ ['a', 'b', 'c'][host | length % 3] }}">{{ (host[:1] or "?") | upper }}</span>
+    <div class="min-w-0">
+      <h1 class="page-title">Audit results</h1>
+      <div class="chip-line">
+        <span class="meta-chip"><i class="bi bi-globe2"></i>{{ result.site_url }}</span>
+        <span class="meta-chip"><i class="bi bi-cpu"></i>{{ analysis.source }}</span>
+        <span class="meta-chip"><i class="bi bi-stopwatch"></i>{{ result.duration_seconds }}s</span>
+      </div>
+    </div>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('audit.new_audit') }}" class="btn btn-outline-brand">
+      <i class="bi bi-arrow-repeat"></i>Run another audit
+    </a>
+  </div>
+</div>
+
+{% if job.lead %}
+<div class="panel mb-3">
+  <div class="panel-header">
+    <h2><i class="bi bi-geo-alt-fill"></i>Business</h2>
+    <a href="{{ url_for('leads.index', view='all') }}">All leads</a>
+  </div>
+  <ul class="detail-list">
+    <li><span class="k">Business name</span><span class="v">{{ job.lead.business_name or "—" }}</span></li>
+    <li><span class="k">Address</span><span class="v">{{ job.lead.address or "—" }}</span></li>
+    <li><span class="k">Phone</span><span class="v">{{ job.lead.phone or "—" }}</span></li>
+    <li><span class="k">Website</span><span class="v"><a href="{{ job.lead.website }}" target="_blank" rel="noopener">{{ job.lead.website }}</a></span></li>
+  </ul>
+</div>
+{% endif %}
+
+{% if job.warnings %}
+  {% for w in job.warnings %}
+  <div class="alert alert-warning" role="alert"><i class="bi bi-exclamation-triangle-fill"></i><div class="alert-body">{{ w }}</div></div>
+  {% endfor %}
+{% endif %}
+
+<div class="row g-3 mb-3">
+  <div class="col-6 col-xl-3">
+    {{ stat_card("Pages crawled", crawl.pages_crawled if crawl.pages_crawled is not none else "—", "bi-globe2", "brand",
+                 (crawl.urls_attempted if crawl.urls_attempted is not none else "—") ~ " attempted, " ~ (crawl.failed_urls if crawl.failed_urls is not none else 0) ~ " failed") }}
+  </div>
+  <div class="col-6 col-xl-3">
+    {{ stat_card("Total issues", analysis.total_issues, "bi-flag-fill", "red", "Across the crawled pages") }}
+  </div>
+  <div class="col-6 col-xl-3">
+    {{ stat_card("Critical / high", bd.get("Critical", 0) + bd.get("High", 0), "bi-exclamation-octagon-fill", "amber", "Fix these first") }}
+  </div>
+  <div class="col-6 col-xl-3">
+    {{ stat_card("Pages affected", analysis.pages_affected, "bi-file-earmark-text-fill", "blue", "Pages with at least one issue") }}
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <a class="download-card" href="{{ url_for('downloads.download', job_id=job.id, kind='report') }}">
+      <span class="dl-icon pdf"><i class="bi bi-file-earmark-pdf-fill"></i></span>
+      <span class="dl-body">
+        <div class="dl-title">PDF report</div>
+        <div class="dl-file">report.pdf</div>
+        <div class="dl-desc">A shareable report with the findings and fixes.</div>
+      </span>
+      <span class="dl-go"><i class="bi bi-download"></i></span>
+    </a>
+  </div>
+  <div class="col-md-4">
+    <a class="download-card" href="{{ url_for('downloads.download', job_id=job.id, kind='issues') }}">
+      <span class="dl-icon csv"><i class="bi bi-file-earmark-spreadsheet-fill"></i></span>
+      <span class="dl-body">
+        <div class="dl-title">Issues list</div>
+        <div class="dl-file">issues.csv</div>
+        <div class="dl-desc">Every issue with its URL, severity and action.</div>
+      </span>
+      <span class="dl-go"><i class="bi bi-download"></i></span>
+    </a>
+  </div>
+  <div class="col-md-4">
+    <a class="download-card" href="{{ url_for('downloads.download', job_id=job.id, kind='summary') }}">
+      <span class="dl-icon csv"><i class="bi bi-file-earmark-bar-graph-fill"></i></span>
+      <span class="dl-body">
+        <div class="dl-title">Run summary</div>
+        <div class="dl-file">run_summary.csv</div>
+        <div class="dl-desc">Outcome and timing details for this audit run.</div>
+      </span>
+      <span class="dl-go"><i class="bi bi-download"></i></span>
+    </a>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="panel mb-3">
+      <div class="panel-header"><h2><i class="bi bi-file-text"></i>Executive summary</h2></div>
+      <div class="panel-body">
+        <p class="summary-text">{{ analysis.summary }}</p>
+        {% if analysis.severity_notes %}<p class="summary-note">{{ analysis.severity_notes }}</p>{% endif %}
+      </div>
+    </div>
+
+    <div class="panel mb-3">
+      <div class="panel-header"><h2><i class="bi bi-list-check"></i>Priority actions</h2></div>
+      {% if analysis.priority_actions %}
+      <ol class="action-list">
+        {% for a in analysis.priority_actions %}
+        <li class="action-item">
+          <div class="action-main">
+            <div class="action-title">{{ a.action }}</div>
+            {% if a.reason %}<div class="action-reason">{{ a.reason }}</div>{% endif %}
+          </div>
+          <div class="action-tags">
+            {% if a.impact %}<span class="tag">Impact: <b>{{ a.impact }}</b></span>{% endif %}
+            {% if a.effort %}<span class="tag">Effort: <b>{{ a.effort }}</b></span>{% endif %}
+          </div>
+        </li>
+        {% endfor %}
+      </ol>
+      {% else %}
+      <div class="panel-body text-muted">No priority actions. No issues were found.</div>
+      {% endif %}
+    </div>
+
+    <div class="panel">
+      <div class="panel-header"><h2><i class="bi bi-lightbulb"></i>Recommendations</h2></div>
+      {% if analysis.recommendations %}
+      <div>
+        {% for r in analysis.recommendations %}
+        <div class="rec-item">
+          <div class="rec-top">
+            <div class="rec-title">{{ r.title or r.related_issue }}</div>
+            {{ severity_badge(r.severity) }}
+          </div>
+          <div class="rec-detail">{{ r.detail }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="panel-body text-muted">No recommendations. No issues were found.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="sticky-panel d-flex flex-column gap-3">
+      <div class="panel">
+        <div class="panel-header"><h2><i class="bi bi-pie-chart"></i>Severity breakdown</h2></div>
+        <div class="panel-body">
+          {% if bd %}
+          {% set ns = namespace(total=0, offset=0) %}
+          {% for k, v in bd.items() %}{% set ns.total = ns.total + v %}{% endfor %}
+          <div class="donut-wrap">
+            <div class="donut" role="img" aria-label="{{ ns.total }} issues by severity">
+              <svg viewBox="0 0 36 36" aria-hidden="true">
+                <circle class="donut-track" cx="18" cy="18" r="15.9155"/>
+                {% if ns.total %}
+                {% for sev in sev_order %}
+                  {% set c = bd.get(sev, 0) %}
+                  {% if c %}
+                  {% set pct = c / ns.total * 100 %}
+                  <circle class="donut-seg {{ sev_class[sev] }}" cx="18" cy="18" r="15.9155"
+                          stroke-dasharray="{{ (pct - 0.6 if pct > 3 else pct) | round(2) }} {{ (100 - pct + 0.6 if pct > 3 else 100 - pct) | round(2) }}"
+                          stroke-dashoffset="{{ (-ns.offset) | round(2) }}"/>
+                  {% set ns.offset = ns.offset + pct %}
+                  {% endif %}
+                {% endfor %}
+                {% for sev, c in bd.items() if sev not in sev_order and c %}
+                  {% set pct = c / ns.total * 100 %}
+                  <circle class="donut-seg sw-unrated" cx="18" cy="18" r="15.9155"
+                          stroke-dasharray="{{ pct | round(2) }} {{ (100 - pct) | round(2) }}"
+                          stroke-dashoffset="{{ (-ns.offset) | round(2) }}"/>
+                  {% set ns.offset = ns.offset + pct %}
+                {% endfor %}
+                {% endif %}
+              </svg>
+              <div class="donut-label"><span class="num">{{ analysis.total_issues }}</span><span class="cap">issues</span></div>
+            </div>
+            <ul class="legend">
+              {% for sev in sev_order if bd.get(sev) is not none %}
+              <li><span class="sw {{ sev_class[sev] }}"></span><span class="nm">{{ sev }}</span><span class="ct">{{ bd[sev] }}</span><span class="pc">{{ ((bd[sev] / ns.total * 100) | round | int) if ns.total else 0 }}%</span></li>
+              {% endfor %}
+              {% for sev, c in bd.items() if sev not in sev_order %}
+              <li><span class="sw sw-unrated"></span><span class="nm">{{ sev }}</span><span class="ct">{{ c }}</span><span class="pc">{{ ((c / ns.total * 100) | round | int) if ns.total else 0 }}%</span></li>
+              {% endfor %}
+            </ul>
+          </div>
+          {% else %}
+          <p class="text-muted mb-0">No issues recorded.</p>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header"><h2><i class="bi bi-diagram-2"></i>Crawl details</h2></div>
+        <ul class="detail-list">
+          <li>
+            <span class="k">Coverage</span>
+            <span class="v">
+              {% if crawl.coverage_limited %}
+                <span class="status-pill status-queued"><span class="dot"></span>Limited by page budget</span>
+              {% else %}
+                <span class="status-pill status-completed"><span class="dot"></span>Fully covered sample</span>
+              {% endif %}
+            </span>
+          </li>
+          <li><span class="k">URLs attempted</span><span class="v">{{ crawl.urls_attempted if crawl.urls_attempted is not none else "—" }}</span></li>
+          <li><span class="k">Failed URLs</span><span class="v">{{ crawl.failed_urls if crawl.failed_urls is not none else 0 }}</span></li>
+          <li><span class="k">Max pages</span><span class="v">{{ crawl.max_pages }}</span></li>
+          <li><span class="k">Crawler</span><span class="v">BeyondSEO {{ crawl.crawler_version or "" }}</span></li>
+          <li><span class="k">Crawl time</span><span class="v">{{ crawl.crawl_seconds }}s</span></li>
+        </ul>
+        {% if crawl.coverage_note %}
+        <div class="px-4 pb-3"><p class="text-muted small mb-0">{{ crawl.coverage_note }}</p></div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="panel mt-3">
+  <div class="panel-header"><h2><i class="bi bi-table"></i>Issue groups</h2></div>
+  <div class="table-responsive">
+    <table class="app-table table table-stack mb-0">
+      <thead>
+        <tr>
+          <th>Severity</th>
+          <th>Issue code</th>
+          <th>Count</th>
+          <th>Pages</th>
+          <th>Example</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for g in analysis.issue_groups %}
+        <tr>
+          <td data-label="Severity">{{ severity_badge(g.severity) }}</td>
+          <td data-label="Issue code"><code>{{ g.code }}</code></td>
+          <td data-label="Count" class="cell-num">{{ g.count }}</td>
+          <td data-label="Pages" class="cell-num">{{ g.pages_affected }}</td>
+          <td data-label="Example">
+            {% if g.example_urls %}
+              <a class="url-link" href="{{ g.example_urls[0] }}" target="_blank" rel="noopener" title="{{ g.example_urls[0] }}">{{ g.example_urls[0] }}</a>
+            {% endif %}
+          </td>
+          <td data-label="Notes" class="cell-muted cell-wide">{{ g.sample_evidence or g.recommendation or "" }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="cell-none text-center text-muted py-4">No issues were found in the crawled pages.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,12 @@
+{% macro severity_badge(severity) %}
+{% set sev = (severity or "Unrated") %}
+{% set css = {
+  "Critical": "sev-critical",
+  "High": "sev-high",
+  "Medium": "sev-medium",
+  "Low": "sev-low",
+  "Info": "sev-info",
+  "Unrated": "sev-unrated",
+}.get(sev, "sev-unrated") %}
+<span class="severity-pill {{ css }}">{{ sev }}</span>
+{% endmacro %}

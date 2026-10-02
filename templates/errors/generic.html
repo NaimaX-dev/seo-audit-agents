@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}{{ title or "Error" }} - SEO Audit Agents{% endblock %}
+{% block content %}
+<div class="error-page is-danger">
+  <div class="panel">
+    <div class="empty-state">
+      <div class="empty-icon is-danger"><i class="bi bi-exclamation-octagon-fill"></i></div>
+      <span class="error-code">Error</span>
+      <h3>{{ title or "Something went wrong" }}</h3>
+      <p>{{ message }}</p>
+      <div class="btn-row">
+        <a href="{{ url_for('dashboard.home') }}" class="btn btn-brand"><i class="bi bi-grid-1x2-fill"></i>Back to dashboard</a>
+        <a href="{{ url_for('audit.new_audit') }}" class="btn btn-outline-brand"><i class="bi bi-plus-lg"></i>New audit</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

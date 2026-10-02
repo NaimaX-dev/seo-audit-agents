@@ -1,0 +1,13 @@
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+logs/
+config.json
+
+# generated audit output (keep the folder, ignore its contents)
+reports/*
+!reports/.gitkeep
+
+# web job storage (created at runtime under reports/_jobs/)
+reports/_jobs/

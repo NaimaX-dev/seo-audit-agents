@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% from "components/empty_state.html" import empty_state %}
+{% block title %}Lead discovery - SEO Audit Agents{% endblock %}
+
+{% macro lead_status(status, job_id) %}
+{% set cls = {"Not audited": "pending", "Queued": "queued", "Auditing": "running", "Audited": "completed", "Failed": "failed"} %}
+<span class="status-pill status-{{ cls.get(status, 'pending') }}"><span class="dot"></span>{{ status }}</span>
+{% endmacro %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Lead discovery</h1>
+    <p class="page-subtitle">Find businesses on Google Maps, then audit their websites with the normal SEO pipeline.</p>
+  </div>
+  <div class="page-actions">
+    {% if last %}
+    <a href="{{ url_for('leads.download', kind='latest') }}" class="btn btn-outline-brand"><i class="bi bi-download"></i>Latest search CSV</a>
+    {% endif %}
+    {% if total_saved %}
+    <a href="{{ url_for('leads.download', kind='all') }}" class="btn btn-outline-brand"><i class="bi bi-filetype-csv"></i>All leads CSV</a>
+    {% endif %}
+  </div>
+</div>
+
+{% if not scraper_ok %}
+<div class="notice mb-3">
+  <i class="bi bi-browser-chrome"></i>
+  <div>
+    <strong>Agent 5 needs Playwright.</strong>
+    {{ scraper_message }}
+  </div>
+</div>
+{% endif %}
+
+<div class="row g-3">
+  <div class="col-lg-9">
+    <div class="panel form-card mb-3">
+      <div class="panel-body">
+        <form id="discover-form" method="post" action="{{ url_for('leads.discover') }}" novalidate>
+          <div class="lead-form-grid">
+            <div>
+              <label for="keyword" class="form-label">Business keyword</label>
+              <input type="text" class="form-control" id="keyword" name="keyword" maxlength="80"
+                     placeholder="Dentists, Restaurants, Software Houses"
+                     value="{{ form.keyword if form else '' }}" required>
+            </div>
+            <div>
+              <label for="location" class="form-label">Location</label>
+              <input type="text" class="form-control" id="location" name="location" maxlength="80"
+                     placeholder="Lahore, Kasur, Dubai"
+                     value="{{ form.location if form else '' }}" required>
+            </div>
+            <div>
+              <label for="max_results" class="form-label">Max results</label>
+              <input type="number" class="form-control" id="max_results" name="max_results"
+                     min="1" max="{{ max_results_limit }}" value="{{ form.max_results if form and form.max_results else 25 }}" required>
+            </div>
+            <div class="lead-form-submit">
+              <button type="submit" id="discover-submit" class="btn btn-brand" {{ 'disabled' if not scraper_ok }}>
+                <i class="bi bi-search"></i>Find Businesses
+              </button>
+            </div>
+          </div>
+          <div class="chip-row" aria-label="Quick result counts">
+            {% for n in (10, 25, 50) %}
+            <button type="button" class="chip-btn" data-fill="#max_results" data-value="{{ n }}">{{ n }} results</button>
+            {% endfor %}
+          </div>
+          <div class="form-text mt-2">
+            Agent 5 opens Google Maps in a browser{{ '' if cfg.maps_headless else ' window (leave it open, it closes itself)' }}
+            and reads each business, so a search can take a minute or two. Only businesses that list a website are kept
+            (up to {{ max_results_limit }} per search).
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <form id="audit-leads-form" method="post" action="{{ url_for('leads.run_audit') }}">
+      <div class="panel" id="leads-panel" data-poll="{{ 'true' if active else 'false' }}" data-status-url="{{ url_for('leads.status_json') }}">
+        <div class="toolbar">
+          <div class="filter-tabs" role="tablist" aria-label="Which leads to show">
+            <a class="filter-tab {{ 'active' if view == 'latest' }}" href="{{ url_for('leads.index') }}">Latest search</a>
+            <a class="filter-tab {{ 'active' if view == 'all' }}" href="{{ url_for('leads.index', view='all') }}">All saved <span class="count">{{ total_saved }}</span></a>
+          </div>
+          <div class="d-flex align-items-center gap-3 ms-auto">
+            <span class="lead-select-count" id="lead-count">0 selected</span>
+            <button type="submit" id="run-audit" class="btn btn-brand" disabled>
+              <i class="bi bi-play-fill"></i>Run SEO Audit
+            </button>
+          </div>
+        </div>
+
+        {% if leads %}
+        <div class="table-responsive">
+          <table class="app-table table table-stack lead-table mb-0">
+            <thead>
+              <tr>
+                <th class="cell-check"><input class="form-check-input" type="checkbox" id="select-all" aria-label="Select all businesses"></th>
+                <th>Business name</th>
+                <th>Address</th>
+                <th>Phone</th>
+                <th>Website</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for lead in leads %}
+              {% set busy = lead.audit_status in ('Queued', 'Auditing') %}
+              <tr data-lead-id="{{ lead.id }}">
+                <td class="cell-check">
+                  <input class="form-check-input lead-check" type="checkbox" name="lead_id" value="{{ lead.id }}"
+                         aria-label="Select {{ lead.business_name }}" {{ 'disabled' if busy }}>
+                </td>
+                <td data-label="Business">
+                  <div class="lead-name">{{ lead.business_name }}</div>
+                  {% if view == 'all' and lead.keyword %}<div class="lead-sub">{{ lead.keyword }} · {{ lead.location }}</div>{% endif %}
+                </td>
+                <td data-label="Address" class="cell-muted cell-address">{{ lead.address or "—" }}</td>
+                <td data-label="Phone" class="cell-muted cell-phone">{{ lead.phone or "—" }}</td>
+                <td data-label="Website">
+                  <a class="url-link text-truncate d-inline-block" href="{{ lead.website }}" target="_blank" rel="noopener" title="{{ lead.website }}">{{ lead.website.split('//')[-1].rstrip('/') }}</a>
+                </td>
+                <td data-label="Status" class="lead-status-cell" data-status="{{ lead.audit_status }}">
+                  {% if lead.audit_status == 'Audited' and lead.job_id %}
+                    <a href="{{ url_for('audit.results', job_id=lead.job_id) }}">{{ lead_status(lead.audit_status, lead.job_id) }}</a>
+                  {% elif lead.audit_status in ('Queued', 'Auditing', 'Failed') and lead.job_id %}
+                    <a href="{{ url_for('audit.progress', job_id=lead.job_id) if lead.audit_status != 'Failed' else url_for('audit.results', job_id=lead.job_id) }}">{{ lead_status(lead.audit_status, lead.job_id) }}</a>
+                  {% else %}
+                    {{ lead_status(lead.audit_status, lead.job_id) }}
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% elif view == 'all' %}
+        <div class="panel-body">
+          {{ empty_state("No leads saved yet", "Search for a keyword and location above to find businesses with websites.", "bi-geo-alt") }}
+        </div>
+        {% else %}
+        <div class="panel-body">
+          {{ empty_state("No businesses yet", "Enter a keyword and a location, then click Find Businesses.", "bi-search-heart") }}
+        </div>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+
+  <div class="col-lg-3">
+    <div class="panel sticky-panel">
+      <div class="panel-header"><h2><i class="bi bi-signpost-split"></i>How it works</h2></div>
+      <div class="panel-body">
+        <ol class="steps">
+          <li><strong>Agent 5 browses Maps</strong>A browser searches Google Maps, scrolls the results and keeps businesses with a website.</li>
+          <li><strong>You pick leads</strong>Select the businesses worth auditing.</li>
+          <li><strong>Agent 2 crawls</strong>Each selected website is audited, one after another.</li>
+          <li><strong>Agents 3/4 and reports</strong>Results appear here, on the dashboard and in History.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/leads.js') }}"></script>
+{% endblock %}

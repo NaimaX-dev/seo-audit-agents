@@ -1,0 +1,16 @@
+{
+  "beyondseo_cmd": ["beyondseo"],
+  "crawl_max_pages": 50,
+  "crawl_mode": "auto",
+
+  "enable_agent3": false,
+  "enable_agent4": true,
+
+  "ollama_model": "qwen3:8b",
+  "ollama_host": "http://localhost:11434",
+  "log_level": "INFO",
+
+  "maps_headless": false,
+  "maps_timeout_seconds": 30,
+  "maps_browser_channel": ""
+}

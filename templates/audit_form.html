@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}New Audit - SEO Audit Agents{% endblock %}
+
+{% block content %}
+{# Engine choice survives a failed submit; a disabled engine falls back to the default. #}
+{% set enabled = {'': True, 'agent3': cfg.enable_agent3, 'agent4': cfg.enable_agent4} %}
+{% set sel = (form.engine if form else '') or '' %}
+{% if not enabled.get(sel, False) %}{% set sel = '' %}{% endif %}
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Start a new audit</h1>
+    <p class="page-subtitle">Enter a website to crawl and analyse for SEO issues.</p>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="panel form-card">
+      <div class="panel-body">
+        <form id="audit-form" data-audit-form method="post" action="{{ url_for('audit.new_audit') }}" novalidate>
+          <div class="form-section">
+            <label for="url" class="form-label">Website URL</label>
+            <div class="input-hero">
+              <i class="bi bi-globe2"></i>
+              <input
+                type="text"
+                class="form-control"
+                id="url"
+                name="url"
+                data-audit-url
+                placeholder="https://example.com"
+                value="{{ form.url if form else '' }}"
+                required
+                autofocus
+              >
+            </div>
+            <div class="invalid-feedback" data-audit-error hidden>Please enter a website URL.</div>
+            <div class="form-text mt-2"><i class="bi bi-shield-check me-1"></i>Only audit sites you own or have permission to crawl.</div>
+          </div>
+
+          <div class="form-section">
+            <label for="max_pages" class="form-label">Max pages to crawl <span class="text-muted fw-normal">(optional)</span></label>
+            <input
+              type="number" min="1" max="1000"
+              class="form-control" id="max_pages" name="max_pages"
+              placeholder="{{ cfg.crawl_max_pages }}"
+              value="{{ form.max_pages if form else '' }}"
+            >
+            <div class="chip-row" aria-label="Quick page limits">
+              {% for n in (10, 50, 100, 250, 500) %}
+              <button type="button" class="chip-btn" data-fill="#max_pages" data-value="{{ n }}">{{ n }} pages</button>
+              {% endfor %}
+            </div>
+            <div class="form-text mt-2">Leave empty to use the default of {{ cfg.crawl_max_pages }}. Allowed range: 1 to 1000.</div>
+          </div>
+
+          <div class="form-section">
+            <div class="form-label" id="engine-label">Analysis engine</div>
+            <div class="option-grid" role="radiogroup" aria-labelledby="engine-label">
+              <label class="option-card">
+                <input type="radio" name="engine" value="" {{ 'checked' if sel == '' }}>
+                <span class="option-face">
+                  <span class="option-icon"><i class="bi bi-magic"></i></span>
+                  <span class="option-title">Use default</span>
+                  <span class="option-desc">{{ "Rule-based" if cfg.enable_agent4 else "Ollama AI" }}, as set in config.json</span>
+                </span>
+                <span class="option-check"><i class="bi bi-check-lg"></i></span>
+              </label>
+              <label class="option-card">
+                <input type="radio" name="engine" value="agent3" {{ 'checked' if sel == 'agent3' }} {{ 'disabled' if not cfg.enable_agent3 }}>
+                <span class="option-face">
+                  <span class="option-icon"><i class="bi bi-robot"></i></span>
+                  <span class="option-title">Ollama AI (Agent 3)</span>
+                  <span class="option-desc">{{ "Disabled in config.json" if not cfg.enable_agent3 else "AI-written analysis with a local model" }}</span>
+                </span>
+                <span class="option-check"><i class="bi bi-check-lg"></i></span>
+              </label>
+              <label class="option-card">
+                <input type="radio" name="engine" value="agent4" {{ 'checked' if sel == 'agent4' }} {{ 'disabled' if not cfg.enable_agent4 }}>
+                <span class="option-face">
+                  <span class="option-icon"><i class="bi bi-diagram-3"></i></span>
+                  <span class="option-title">Rule-based (Agent 4)</span>
+                  <span class="option-desc">{{ "Disabled in config.json" if not cfg.enable_agent4 else "Fast, consistent checks with no AI needed" }}</span>
+                </span>
+                <span class="option-check"><i class="bi bi-check-lg"></i></span>
+              </label>
+            </div>
+          </div>
+
+          <div class="d-grid mt-4">
+            <button type="submit" id="submit-audit" data-audit-submit class="btn btn-brand btn-lg">
+              <i class="bi bi-play-fill"></i>Start audit
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="panel sticky-panel">
+      <div class="panel-header"><h2><i class="bi bi-signpost-split"></i>What happens next</h2></div>
+      <div class="panel-body">
+        <ol class="steps">
+          <li><strong>Agent 1 checks the URL</strong>Makes sure the address is valid and reachable.</li>
+          <li><strong>Agent 2 crawls the site</strong>BeyondSEO collects pages, links and metadata.</li>
+          <li><strong>Agent 3 or 4 analyses</strong>Findings are grouped by severity and priority.</li>
+          <li><strong>Reports are generated</strong>A PDF report and CSV files are ready to download.</li>
+        </ol>
+        <div class="notice mt-4">
+          <i class="bi bi-info-circle-fill"></i>
+          <div>Audits run in the background. You can leave the progress page and find the audit in History later.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

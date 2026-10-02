@@ -1,0 +1,10 @@
+{% macro stat_card(label, value, icon="bi-graph-up", tone="brand", hint=None) %}
+<div class="kpi-card">
+  <div class="min-w-0">
+    <div class="kpi-label">{{ label }}</div>
+    <div class="kpi-value">{{ value if value is not none else "0" }}</div>
+    {% if hint %}<div class="kpi-hint">{{ hint }}</div>{% endif %}
+  </div>
+  <span class="kpi-icon tone-{{ tone }}"><i class="bi {{ icon }}"></i></span>
+</div>
+{% endmacro %}

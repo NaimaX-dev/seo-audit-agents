@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% from "components/status_badge.html" import status_badge %}
+{% from "components/empty_state.html" import empty_state %}
+{% from "components/stat_card.html" import stat_card %}
+{% from "components/site_cell.html" import site_cell %}
+{% block title %}Dashboard - SEO Audit Agents{% endblock %}
+
+{% block content %}
+{% set finished = stats.completed + stats.failed %}
+{% set engine_label = 'Ollama (Qwen3)' if cfg.enable_agent3 and not cfg.enable_agent4 else 'the rule-based engine' if cfg.enable_agent4 else 'the configured engine' %}
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Dashboard</h1>
+    <p class="page-subtitle">Crawl a site, analyse it with {{ engine_label }}, and download a report.</p>
+  </div>
+</div>
+
+<section class="hero" aria-label="Quick audit">
+  <h2>Audit a website in minutes</h2>
+  <p>Paste a URL and we crawl it, find SEO issues and prepare a PDF report with the fixes ranked by priority.</p>
+  <form id="quick-audit-form" data-audit-form method="post" action="{{ url_for('audit.new_audit') }}" novalidate>
+    <div class="input-hero">
+      <i class="bi bi-globe2"></i>
+      <input type="text" class="form-control" name="url" data-audit-url placeholder="https://example.com" aria-label="Website URL" required>
+      <button type="submit" class="btn btn-brand btn-lg" data-audit-submit>
+        <i class="bi bi-play-fill"></i>Start audit
+      </button>
+    </div>
+    <div class="invalid-feedback" data-audit-error hidden>Enter a website URL to audit.</div>
+  </form>
+  <div class="hero-links">
+    Need to set the page limit or analysis engine? <a href="{{ url_for('audit.new_audit') }}">Open advanced options</a>
+  </div>
+</section>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-xl-3">
+    {{ stat_card("Total audits", stats.total_audits, "bi-collection-fill", "brand",
+                 (stats.active ~ " in progress") if stats.active else "None in progress") }}
+  </div>
+  <div class="col-6 col-xl-3">
+    {{ stat_card("Completed", stats.completed, "bi-check-circle-fill", "green",
+                 ((stats.completed / finished * 100) | round | int ~ "% success rate") if finished else "No finished audits yet") }}
+  </div>
+  <div class="col-6 col-xl-3">
+    {{ stat_card("Running", stats.running + stats.queued, "bi-arrow-repeat", "blue",
+                 (stats.queued ~ " waiting in queue") if stats.queued else "Nothing queued") }}
+  </div>
+  <div class="col-6 col-xl-3">
+    {{ stat_card("Failed", stats.failed, "bi-x-circle-fill", "red",
+                 "Open History for details" if stats.failed else "All clear") }}
+  </div>
+</div>
+
+{# ---- Lead Discovery (Agent 5) ---- #}
+{% set latest = lead_stats.latest %}
+<div class="d-flex align-items-center justify-content-between mb-2">
+  <h2 class="h6 fw-semibold text-body-emphasis mb-0"><i class="bi bi-geo-alt-fill me-1" style="color: var(--violet);"></i>Lead discovery</h2>
+  <a href="{{ url_for('leads.index') }}" class="small fw-semibold">Find businesses</a>
+</div>
+<div class="row g-3 mb-4">
+  <div class="col-6 col-xl">
+    {{ stat_card("Total leads", lead_stats.total_leads, "bi-people-fill", "brand",
+                 ("Unique businesses, " ~ lead_stats.runs ~ " search" ~ ("" if lead_stats.runs == 1 else "es")) if lead_stats.runs else "No searches yet") }}
+  </div>
+  <div class="col-6 col-xl">
+    {{ stat_card("With website", lead_stats.with_website, "bi-globe2", "blue", "Saved in data/leads.csv") }}
+  </div>
+  <div class="col-6 col-xl">
+    {{ stat_card("Audited websites", lead_stats.audited, "bi-check2-circle", "green",
+                 ((lead_stats.with_website - lead_stats.audited) ~ " not audited yet") if lead_stats.with_website else "Nothing to audit yet") }}
+  </div>
+  <div class="col-6 col-xl">
+    {{ stat_card("Potential clients", lead_stats.potential_clients, "bi-bullseye", "amber", "Audited, with critical/high issues") }}
+  </div>
+  <div class="col-12 col-xl lead-kpi-latest">
+    {{ stat_card("Latest discovery", (latest.keyword ~ " · " ~ latest.location) if latest else "None yet", "bi-search-heart", "slate",
+                 (latest.with_website ~ " with website · " ~ latest.at[:10]) if latest else "Run Lead discovery to start") }}
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="panel h-100">
+      <div class="panel-header">
+        <h2><i class="bi bi-clock-history"></i>Recent audits</h2>
+        <a href="{{ url_for('dashboard.history') }}">View all</a>
+      </div>
+      {% if jobs %}
+      <div class="table-responsive">
+        <table class="app-table table table-stack mb-0">
+          <thead>
+            <tr>
+              <th>Website</th>
+              <th>Status</th>
+              <th>Issues</th>
+              <th>Started</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for job in jobs %}
+            {% set target = url_for('audit.results', job_id=job.id) if job.status == 'completed' else url_for('audit.progress', job_id=job.id) %}
+            <tr class="is-clickable" data-href="{{ target }}">
+              <td class="cell-site" style="max-width: 280px;">{{ site_cell(job.url) }}</td>
+              <td data-label="Status">{{ status_badge(job.status) }}</td>
+              <td data-label="Issues" class="cell-num">{{ job.result.analysis.total_issues if job.result else "—" }}</td>
+              <td data-label="Started" class="cell-muted">
+                <div class="date-cell">{{ job.created_at[:10] }}<small>{{ job.created_at[11:16] }} UTC</small></div>
+              </td>
+              <td class="cell-actions">
+                {% if job.status == "completed" %}
+                  <a class="btn btn-sm btn-outline-brand" href="{{ url_for('audit.results', job_id=job.id) }}">View</a>
+                {% elif job.status in ("queued", "running") %}
+                  <a class="btn btn-sm btn-outline-brand" href="{{ url_for('audit.progress', job_id=job.id) }}">Track</a>
+                {% else %}
+                  <a class="btn btn-sm btn-outline-brand" href="{{ url_for('audit.results', job_id=job.id) }}">Details</a>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      {{ empty_state("No audits yet", "Run your first SEO audit to see crawl results, issues and recommendations here.", "bi-inboxes", "Start a new audit", url_for('audit.new_audit')) }}
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="d-flex flex-column gap-3 h-100">
+      <div class="panel issues-card">
+        <div class="d-flex align-items-start justify-content-between gap-3">
+          <div>
+            <div class="kpi-label">Issues found</div>
+            <div class="issues-number mt-2">{{ stats.total_issues }}</div>
+            <div class="kpi-hint">Across all completed audits</div>
+          </div>
+          <span class="kpi-icon tone-brand"><i class="bi bi-flag-fill"></i></span>
+        </div>
+        {% if stats.last_issue_count is not none %}
+        <div class="d-flex justify-content-between align-items-center mt-3 pt-3" style="border-top: 1px solid var(--line-soft);">
+          <span class="kpi-label">Most recent audit</span>
+          <span class="fw-semibold text-body-emphasis text-tabular">{{ stats.last_issue_count }} issue{{ '' if stats.last_issue_count == 1 else 's' }}</span>
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="panel flex-grow-1">
+        <div class="panel-header"><h2><i class="bi bi-activity"></i>System status</h2></div>
+        <ul class="status-list">
+          <li>
+            <span class="sl-icon"><i class="bi bi-globe2"></i></span>
+            <div class="min-w-0">
+              <div class="sl-name">BeyondSEO crawler</div>
+              <div class="sl-detail">{{ status.beyondseo.detail }}</div>
+            </div>
+            <span class="status-dot {{ 'ok' if status.beyondseo.ok else 'bad' }}"></span>
+          </li>
+          <li>
+            <span class="sl-icon"><i class="bi bi-robot"></i></span>
+            <div class="min-w-0">
+              <div class="sl-name">Ollama (Agent 3)</div>
+              <div class="sl-detail">{{ status.ollama.detail }}</div>
+            </div>
+            <span class="status-dot {{ 'ok' if status.ollama.ok else ('na' if status.ollama.ok is none else 'bad') }}"></span>
+          </li>
+          <li>
+            <span class="sl-icon"><i class="bi bi-diagram-3"></i></span>
+            <div class="min-w-0">
+              <div class="sl-name">Rule-based engine (Agent 4)</div>
+              <div class="sl-detail">Always available</div>
+            </div>
+            <span class="status-dot ok"></span>
+          </li>
+        </ul>
+        <div class="px-4 pb-3">
+          <p class="text-muted small mb-0">Status is checked periodically. Refresh the page to check again.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

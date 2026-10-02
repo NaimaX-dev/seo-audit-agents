@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Audit failed - SEO Audit Agents{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Audit failed</h1>
+    <p class="page-subtitle text-break">{{ job.url }}</p>
+  </div>
+</div>
+
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="panel fail-card">
+      <div class="panel-header">
+        <h2><i class="bi bi-x-octagon-fill"></i>{{ job.error.title if job.error else "Audit failed" }}</h2>
+        <span class="status-pill status-failed"><span class="dot"></span>Failed</span>
+      </div>
+      <div class="panel-body">
+        <p class="text-body-emphasis">{{ job.error.message if job.error else job.message }}</p>
+        {% if job.error and job.error.hint %}
+        <div class="alert alert-info"><i class="bi bi-lightbulb-fill"></i><div class="alert-body">{{ job.error.hint }}</div></div>
+        {% endif %}
+        {% if job.warnings %}
+          {% for w in job.warnings %}
+          <div class="alert alert-warning"><i class="bi bi-exclamation-triangle-fill"></i><div class="alert-body">{{ w }}</div></div>
+          {% endfor %}
+        {% endif %}
+
+        {% if job.log %}
+        <h2 class="h6 mt-3 mb-2">Recent log</h2>
+        <div class="log-console is-static">{{ job.log[-30:] | join('\n') }}</div>
+        {% endif %}
+
+        <div class="d-flex flex-wrap gap-2 mt-4">
+          <a href="{{ url_for('audit.new_audit') }}" class="btn btn-brand">
+            <i class="bi bi-arrow-repeat"></i>Try again
+          </a>
+          <a href="{{ url_for('dashboard.home') }}" class="btn btn-outline-brand">Back to dashboard</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

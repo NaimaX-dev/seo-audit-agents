@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% from "components/status_badge.html" import status_badge %}
+{% from "components/empty_state.html" import empty_state %}
+{% from "components/site_cell.html" import site_cell %}
+{% block title %}Audit history - SEO Audit Agents{% endblock %}
+
+{% block content %}
+{% set n_done = jobs | selectattr('status', 'equalto', 'completed') | list | length %}
+{% set n_active = (jobs | selectattr('status', 'in', ['queued', 'running']) | list | length) %}
+{% set n_failed = jobs | selectattr('status', 'equalto', 'failed') | list | length %}
+{% set engines = {'agent3': 'Ollama AI', 'agent4': 'Rule-based'} %}
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Audit history</h1>
+    <p class="page-subtitle">Every audit run through the web interface, newest first.</p>
+  </div>
+  <div class="page-actions">
+    <a href="{{ url_for('audit.new_audit') }}" class="btn btn-brand"><i class="bi bi-plus-lg"></i>New audit</a>
+  </div>
+</div>
+
+{% if jobs %}
+<div class="panel" id="history-panel">
+  <div class="toolbar">
+    <div class="search-field">
+      <i class="bi bi-search"></i>
+      <input type="search" class="form-control" id="history-search" placeholder="Search websites" aria-label="Search websites">
+    </div>
+    <div class="filter-tabs" role="tablist" aria-label="Filter by status">
+      <button type="button" class="filter-tab active" data-filter="all">All <span class="count">{{ jobs | length }}</span></button>
+      <button type="button" class="filter-tab" data-filter="completed">Completed <span class="count">{{ n_done }}</span></button>
+      <button type="button" class="filter-tab" data-filter="active">Running <span class="count">{{ n_active }}</span></button>
+      <button type="button" class="filter-tab" data-filter="failed">Failed <span class="count">{{ n_failed }}</span></button>
+    </div>
+  </div>
+
+  <div class="table-responsive">
+    <table class="app-table table table-stack mb-0">
+      <thead>
+        <tr>
+          <th>Website</th>
+          <th>Status</th>
+          <th>Engine</th>
+          <th>Issues</th>
+          <th>Started</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="history-body">
+        {% for job in jobs %}
+        {% set target = url_for('audit.results', job_id=job.id) if job.status == 'completed' else url_for('audit.progress', job_id=job.id) %}
+        <tr class="is-clickable" data-href="{{ target }}"
+            data-status="{{ 'active' if job.status in ('queued', 'running') else job.status }}"
+            data-search="{{ job.url | lower }}">
+          <td class="cell-site" style="max-width: 320px;">{{ site_cell(job.url) }}</td>
+          <td data-label="Status">{{ status_badge(job.status) }}</td>
+          <td data-label="Engine" class="cell-muted">
+            {% set e = job.engine or job.engine_requested %}
+            {% if e %}<span class="tag">{{ engines.get(e, e) }}</span>{% else %}—{% endif %}
+          </td>
+          <td data-label="Issues" class="cell-num">{{ job.result.analysis.total_issues if job.result else "—" }}</td>
+          <td data-label="Started" class="cell-muted">
+            <div class="date-cell">{{ job.created_at[:10] }}<small>{{ job.created_at[11:16] }} UTC</small></div>
+          </td>
+          <td class="cell-actions">
+            {% if job.status == "completed" %}
+              <a class="btn btn-sm btn-outline-brand" href="{{ url_for('audit.results', job_id=job.id) }}">View</a>
+            {% elif job.status in ("queued", "running") %}
+              <a class="btn btn-sm btn-outline-brand" href="{{ url_for('audit.progress', job_id=job.id) }}">Track</a>
+            {% else %}
+              <a class="btn btn-sm btn-outline-brand" href="{{ url_for('audit.results', job_id=job.id) }}">Details</a>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div id="history-empty" class="empty-state" hidden>
+    <div class="empty-icon"><i class="bi bi-search"></i></div>
+    <h3>No matching audits</h3>
+    <p>Try a different search or choose another status filter.</p>
+  </div>
+</div>
+{% else %}
+<div class="panel">
+  {{ empty_state("No audits yet", "Run your first SEO audit to see it listed here.", "bi-inboxes", "Start a new audit", url_for('audit.new_audit')) }}
+</div>
+{% endif %}
+{% endblock %}

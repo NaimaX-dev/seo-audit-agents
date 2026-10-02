@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Auditing {{ job.url }} - SEO Audit Agents{% endblock %}
+
+{% block content %}
+{% set order = ['queued', 'reading', 'preflight', 'crawling', 'analyzing', 'reporting'] %}
+{% set cur = order.index(job.stage) if job.stage in order else 0 %}
+{% set stages = [
+  ('reading',   'Agent 1 - Reading URL',                  'Validating the website address.'),
+  ('preflight', 'Checking crawler & analysis engine',     'Making sure BeyondSEO and the analysis engine are ready.'),
+  ('crawling',  'Agent 2 - Crawling with BeyondSEO',      'Visiting pages and collecting links, metadata and content.'),
+  ('analyzing', 'Agent 3/4 - Analysing issues',           'Grouping findings and ranking what to fix first.'),
+  ('reporting', 'Building PDF report',                    'Writing the PDF and CSV files for download.'),
+] %}
+{% set CIRC = 339.292 %}
+<div
+  id="progress-root"
+  data-job-id="{{ job.id }}"
+  data-status-url="{{ url_for('audit.status_json', job_id=job.id) }}"
+  data-results-url="{{ url_for('audit.results', job_id=job.id) }}"
+  data-failed-url="{{ url_for('audit.results', job_id=job.id) }}"
+  data-started="{{ job.started_at or job.created_at }}"
+>
+  <div class="page-header">
+    <div class="min-w-0">
+      <h1 class="page-title text-break">Auditing {{ job.url }}</h1>
+      <p class="page-subtitle">This runs in the background. You can leave this page and check History later.</p>
+    </div>
+    <div class="page-actions">
+      <a href="{{ url_for('dashboard.history') }}" class="btn btn-outline-brand"><i class="bi bi-clock-history"></i>View history</a>
+    </div>
+  </div>
+
+  <div id="progress-warnings"></div>
+
+  <div class="row g-3">
+    <div class="col-lg-6">
+      <div class="panel overflow-hidden">
+        <div class="progress-hero">
+          <div class="ring" role="progressbar" aria-label="Audit progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ job.progress }}" id="progress-ring-wrap">
+            <svg viewBox="0 0 120 120" aria-hidden="true">
+              <defs>
+                <linearGradient id="ring-grad" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stop-color="#7c5cfa"/>
+                  <stop offset="55%" stop-color="#4f8df7"/>
+                  <stop offset="100%" stop-color="#19c3b1"/>
+                </linearGradient>
+              </defs>
+              <circle class="ring-track" cx="60" cy="60" r="54"/>
+              <circle class="ring-value" id="progress-ring" cx="60" cy="60" r="54"
+                      stroke-dasharray="{{ CIRC }}" stroke-dashoffset="{{ (CIRC * (1 - job.progress / 100)) | round(2) }}"/>
+            </svg>
+            <div class="ring-label"><span class="num"><span id="progress-percent">{{ job.progress }}</span><small>%</small></span></div>
+          </div>
+          <div class="progress-meta">
+            <span class="status-pill status-{{ job.status }}" id="progress-status">
+              <span class="dot"></span><span id="progress-status-text">{{ 'Running' if job.status == 'running' else 'Pending' }}</span>
+            </span>
+            <h2>Audit in progress</h2>
+            <p id="progress-message">{{ job.message }}</p>
+          </div>
+        </div>
+        <div class="meta-grid">
+          <div><div class="k">Elapsed</div><div class="v" id="progress-elapsed">0:00</div></div>
+          <div><div class="k">Engine</div><div class="v">{{ {'agent3': 'Ollama AI', 'agent4': 'Rule-based'}.get(job.engine or job.engine_requested, 'Default') }}</div></div>
+          <div><div class="k">Max pages</div><div class="v">{{ job.max_pages or 'Default' }}</div></div>
+        </div>
+      </div>
+
+      <div class="panel mt-3">
+        <div class="panel-header"><h2><i class="bi bi-list-check"></i>Progress timeline</h2></div>
+        <ol class="timeline">
+          {% for key, title, desc in stages %}
+          {% set idx = order.index(key) %}
+          <li class="stage-item {{ 'done' if idx < cur else ('active' if idx == cur else '') }}" data-stage="{{ key }}">
+            <span class="stage-marker">
+              <i class="bi bi-circle icon-idle" style="font-size:.5rem;"></i>
+              <i class="bi bi-check-lg icon-done"></i>
+              <span class="spinner"></span>
+            </span>
+            <div class="stage-body">
+              <div class="stage-title">{{ title }}</div>
+              <div class="stage-desc">{{ desc }}</div>
+            </div>
+          </li>
+          {% endfor %}
+        </ol>
+      </div>
+    </div>
+
+    <div class="col-lg-6">
+      <div class="terminal sticky-panel">
+        <div class="terminal-head">
+          <span><i class="bi bi-terminal me-2"></i>Live log</span>
+          <span class="live-badge"><span class="status-dot"></span>Live</span>
+        </div>
+        <div id="log-console" class="log-console" aria-live="off">{{ job.log | join('\n') }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

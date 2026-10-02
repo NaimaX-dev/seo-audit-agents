@@ -1,0 +1,12 @@
+{# Website avatar + hostname + full URL, used by the dashboard and history tables. #}
+{% macro site_cell(url) %}
+{% set raw = (url or "").split("//")[-1].split("/")[0] %}
+{% set host = raw[4:] if raw.startswith("www.") else raw %}
+<div class="site-cell">
+  <span class="site-avatar av-{{ ['a', 'b', 'c'][host | length % 3] }}">{{ (host[:1] or "?") | upper }}</span>
+  <div class="site-meta">
+    <div class="site-host text-truncate">{{ host or url }}</div>
+    <div class="site-url text-truncate">{{ url }}</div>
+  </div>
+</div>
+{% endmacro %}
